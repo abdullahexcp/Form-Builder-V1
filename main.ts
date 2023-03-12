@@ -1,29 +1,109 @@
-interface DataType {
-    name: string;
-    type: string;
-    // additional properties
+import { Promise } from 'es6-promise'
+
+enum DataTypes {
+    Text = "text",
+    Number = "number",
+    Lookup = "lookup",
+    OptionSet = "optionSet",
+    DateTime = "dateTime",
+    Boolean = "boolean",
+    Currency = "currency",
+    SingleLineOfText = "singleLineOfText",
+    MultipleLinesOfText = "multipleLinesOfText",
+    WholeNumber = "wholeNumber",
+    FloatingPointNumber = "floatingPointNumber",
+    DateOnly = "dateOnly",
+    Timezone = "timezone",
+    Duration = "duration",
+    DecimalNumber = "decimalNumber"
 }
 
-interface Field {
+
+interface OptionSetValue {
+    label: string;
+    value: number | string;
+}
+
+interface FieldTypeAttributes {
+    maxLength?: number;
+    precision?: number;
+    options?: OptionSetValue[];
+}
+
+class FieldType {
+    public readonly dataType: string;
+    public readonly attributes: FieldTypeAttributes;
+
+    constructor(dataType: DataTypes, attributes?: FieldTypeAttributes) {
+        this.dataType = dataType;
+        this.attributes = attributes || {};
+    }
+}
+
+
+class Field {
+    id: string;
     name: string;
     label: string;
     required: boolean;
-    dataType: DataType;
+    type: FieldType;
     // additional properties
 }
 
-interface Layout extends Component {
-    name: string;
+interface Component {
     label: string;
-    columns: number;
-    children: Array<Component>;
+    visible: boolean;
+    styleClass: string;
 }
 
-interface Component {
-    type: string;
+class FieldComponent implements Component {
+    dataType?: FieldType;
     field?: Field;
     layout?: Layout;
+    label: string;
+    visible: boolean;
+    styleClass: string;
+
+    constructor(field: Field, fieldType?: FieldType, layout?: Layout, visible?: boolean, styleClass?: string) {
+        this.field = field;
+        this.label = field.label;
+        this.visible = visible ?? true;
+        this.styleClass = styleClass;
+        this.dataType = fieldType ?? field.type;
+        this.layout = layout;
+    }
 }
+
+interface Layout {
+    label: string;
+    columns: Array<Array<Component>>;
+}
+
+
+const fieldsDataSample = [
+    {
+        "id": "1",
+        "type": "text",
+        "label": "Name",
+        "required": true,
+        "placeholder": "Enter your name"
+    },
+    {
+        "id": "2",
+        "type": "email",
+        "label": "Email",
+        "required": true,
+        "placeholder": "Enter your email"
+    },
+    {
+        "id": "3",
+        "type": "textarea",
+        "label": "Message",
+        "required": false,
+        "placeholder": "Enter your message"
+    }
+];
+
 
 class FormBuilder {
     private formContainer: HTMLElement;
@@ -53,8 +133,13 @@ class FormBuilder {
         this.sidebarFields = [];
 
         // Load fields from API
-        this.loadFieldsFromApi('https://example.com/api/fields');
-
+        this.loadFieldsFromApi('https://example.com/api/fields')
+            .then(() => {
+                // do something after the API call is successful
+            })
+            .catch(() => {
+                // handle the error
+            });
         // Initialize event listeners
         this.initEventListeners();
 
@@ -62,20 +147,30 @@ class FormBuilder {
         this.renderSidebar();
     }
 
-    async loadFieldsFromApi(apiUrl: string) {
-        try {
-            const response = await fetch(apiUrl);
-            const json = await response.json();
-            if (Array.isArray(json)) {
-                this.sidebarFields = json;
-                this.renderSidebar();
-            } else {
-                console.error('Invalid API response');
-            }
-        } catch (error) {
-            console.error('Error loading fields from API', error);
-        }
+    loadFieldsFromApi(apiUrl: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            //     fetch(apiUrl)
+            //         .then(response => response.json())
+            //         .then(json => {
+            //             if (Array.isArray(json)) {
+            //                 this.sidebarFields = json;
+            //                 this.renderSidebar();
+            //                 resolve("");
+            //             } else {
+            //                 console.error('Invalid API response');
+            //                 reject();
+            //             }
+            //         })
+            //         .catch(error => {
+            //             console.error('Error loading fields from API', error);
+            //             reject();
+            //         });
+            this.sidebarFields = fieldsDataSample;
+            resolve("");
+        });
+
     }
+
 
     private renderSidebar() {
         const sidebar = this.sidebarContainer.querySelector('#sidebar');
@@ -112,12 +207,12 @@ class FormBuilder {
             if (this.draggingField) {
                 const field = JSON.parse(this.draggingField.dataset.field || '{}') as Field;
                 const component: Component = {
-                    type: 'field',
+                    dataType: 'field',
                     field: field
                 };
                 const layoutElement = this.getLayoutElementAtEvent(event);
                 if (layoutElement) {
-                    const layout = this.getComponentFromElement(layoutElement) as Layout|null;
+                    const layout = this.getComponentFromElement(layoutElement) as Layout | null;
                     if (layout) {
                         layout.children.push(component);
                         this.renderForm();
@@ -135,7 +230,7 @@ class FormBuilder {
             const columns = prompt('Enter number of columns for layout');
             if (columns) {
                 const layout: Layout = {
-                    type: 'layout',
+                    dataType: 'layout',
                     name: 'Layout',
                     label: 'Layout',
                     columns: parseInt(columns),
@@ -172,13 +267,13 @@ class FormBuilder {
 
     private getLayoutElementAtEvent(event: DragEvent, element: HTMLElement = event.target as HTMLElement): HTMLElement | null {
         if (element.matches('.layout')) {
-          return element;
+            return element;
         } else if (element.parentElement) {
-          return this.getLayoutElementAtEvent(event, element.parentElement);
+            return this.getLayoutElementAtEvent(event, element.parentElement);
         }
         return null;
-      }
-      
+    }
+
 
     private renderForm() {
         this.formContainer.innerHTML = '';
@@ -189,26 +284,26 @@ class FormBuilder {
     }
 
     private createComponentElement(component: Component): HTMLElement {
-        if (component.type === 'field') {
+        if (component.dataType === 'field') {
             const field = component.field!;
             const fieldElement = document.createElement('div');
             fieldElement.setAttribute('class', 'field');
             fieldElement.setAttribute('data-component', JSON.stringify(component));
-            fieldElement.innerHTML = `<label>${ field.label } </label><input type="${field.dataType.type}" required="${field.required}">`;
+            fieldElement.innerHTML = `<label>${field.label} </label><input type="${field.dataType.type}" required="${field.required}">`;
             return fieldElement;
-        } else if (component.type === 'layout') {
+        } else if (component.dataType === 'layout') {
             const layout = component.layout!;
             const layoutElement = document.createElement('div');
             layoutElement.setAttribute('class', 'layout');
             layoutElement.setAttribute('data-component', JSON.stringify(component));
-            layoutElement.style.gridTemplateColumns = `repeat(${ layout.columns }, 1fr)`;
+            layoutElement.style.gridTemplateColumns = `repeat(${layout.columns}, 1fr)`;
             for (const child of layout.children) {
                 const childElement = this.createComponentElement(child);
                 layoutElement.appendChild(childElement);
             }
             return layoutElement;
         }
-        throw new Error(`Invalid component type: ${ component.type }`);
+        throw new Error(`Invalid component type: ${component.dataType}`);
     }
 }
 

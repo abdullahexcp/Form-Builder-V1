@@ -1,5 +1,5 @@
 {
-  "name": "form-builder-v1---chatgpt-version",
+  "name": "form-builder-v1",
   "version": "1.0.0",
   "description": "",
   "main": "main.js",
@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/es6-promise": "^3.3.0",
     "typescript": "^4.9.5"
   }
 }
