@@ -1,0 +1,8 @@
+form builder
+- load fields array into the fields column
+- on drag into layout/component (and remove from fields)
+  - update object 
+  - update the form html (editor mode)
+- on drag back into fields (remove from form)
+- on field dbl click open the options dialog for the field componenet or layout
+- export the formObject into json
