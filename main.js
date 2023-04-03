@@ -80,6 +80,25 @@ var Form = /** @class */ (function () {
     function Form(rootLayoutComponent) {
         this.rootLayoutComponent = rootLayoutComponent;
     }
+    Form.prototype.getFormAllNestedHtmlElementsAsList = function () {
+        var elements = [];
+        var traverseComponents = function (components) {
+            components.forEach(function (component) {
+                if (component instanceof LayoutComponent) {
+                    traverseComponents(component.columns.flat());
+                }
+                else if (component instanceof FieldComponent) {
+                    if (component.elementRef) {
+                        elements.push(component.elementRef);
+                    }
+                }
+            });
+        };
+        if (this.rootLayoutComponent) {
+            traverseComponents(this.rootLayoutComponent.columns.flat());
+        }
+        return elements;
+    };
     return Form;
 }());
 var FormBuilder = /** @class */ (function () {
@@ -160,9 +179,10 @@ var FormBuilder = /** @class */ (function () {
                 _this.removeField(fieldElement);
             }
         }); });
-        //     this.form.addEventListener('dragover', (event) => {
-        //         event.preventDefault();
-        //     });
+        // darg over highlight the form componenets
+        this.form.addEventListener('dragover', function (event) {
+            event.preventDefault();
+        });
         // this.form.addEventListener('drop', (event) => {
         //     event.preventDefault();
         //     if (this.draggingField) {
