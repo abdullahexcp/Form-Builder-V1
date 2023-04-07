@@ -1,4 +1,4 @@
-
+const crypto = require('crypto');
 
 enum DataTypes {
     Text = "text",
@@ -85,7 +85,7 @@ class FieldComponent implements Component {
         this.field = field;
         this.label = label ?? field.label;
         this.visible = visible ?? true;
-        this.styleClass = styleClass??"field-component";
+        this.styleClass = styleClass ?? "field-component";
         this.dataType = fieldType ?? field.type;
         this.layoutColumnId = layoutColumnId;
         this.elementRef = elementRef;
@@ -104,14 +104,14 @@ class LayoutComponent implements Component {
         this.id = id ?? crypto.randomUUID();
         this.label = label;
         this.visible = visible ?? true;
-        this.styleClass = styleClass??"layout-component";
+        this.styleClass = styleClass ?? "layout-component";
         this.elementRef = elementRef;
-        this.columns = columns ?? new Array(this.initNewColumn());
+        this.columns = columns ?? new Array();
     }
 
-    private initNewColumn() {
-        return new LayoutColumnComponent(crypto.randomUUID());
-    }
+    // private initNewColumn() {
+    //     return new LayoutColumnComponent();
+    // }
 }
 
 class LayoutColumnComponent implements Component {
@@ -127,7 +127,7 @@ class LayoutColumnComponent implements Component {
         this.id = id ?? crypto.randomUUID();
         this.label = label;
         this.visible = visible ?? true;
-        this.styleClass = styleClass??"layout-column-component";
+        this.styleClass = styleClass ?? "layout-column-component";
         this.parentLayoutId = parentLayoutId;
         this.elementRef = elementRef;
     }
@@ -198,32 +198,11 @@ class Form {
         this.rootLayoutComponent = rootLayoutComponent;
     }
 
-    getFormAllNestedHtmlElementsAsList(): Array<HTMLElement> {
-        const elements: Array<HTMLElement> = [];
 
-        const traverseComponents = (components: Array<Component>) => {
-            components.forEach((component) => {
-                if (component instanceof LayoutComponent) {
-                    traverseComponents(component.columns.flat());
-                } else if (component instanceof FieldComponent) {
-                    if (component.elementRef) {
-                        elements.push(component.elementRef);
-                    }
-                }
-            });
-        };
+    insertFieldIntoLayoutColumn(fieldElement: HTMLElement, parentColumnElement: HTMLElement) {
 
-        if (this.rootLayoutComponent) {
-            traverseComponents(this.rootLayoutComponent.columns.flat());
-        }
-
-        return elements;
-    }
-
-    insertFieldIntoLayoutColumn(fieldElement: HTMLElement, targetElement: HTMLElement) {
         const dataField = fieldElement.getAttribute('data-field');
         const field = JSON.parse(dataField);
-        const parentColumnElement = targetElement.closest('.layout-column-component') as HTMLElement;
         const dataLayoutColumn = parentColumnElement.getAttribute('data-col');
         const layoutColumn = JSON.parse(dataLayoutColumn);
 
@@ -231,7 +210,7 @@ class Form {
         //insert field visually
         const listItemElement = document.createElement("li");
         listItemElement.draggable = true;
-        
+
         // TODO : li event listner on drag
 
         const label = document.createElement("label");
@@ -255,12 +234,54 @@ class Form {
         listItemElement.dataset.fieldComponent = JSON.stringify(fieldComponenet);
         let nestedLayoutCompnent = this.getComponentById(layoutColumn.id) as LayoutColumnComponent;
         nestedLayoutCompnent.childrenComponents.push(fieldComponenet);
-        
+
+    }
+
+    getComponentById(id: string, component: Component = this.rootLayoutComponent): Component | undefined {
+        if (component.id === id) {
+            return component;
+        }
+
+        if (component instanceof LayoutComponent) {
+            for (const column of component.columns) {
+                const result = this.getComponentById(id, column);
+                if (result) {
+                    return result;
+                }
+            }
+        }
+
+        if (component instanceof LayoutColumnComponent) {
+            for (const child of component.childrenComponents || []) {
+                const result = this.getComponentById(id, child);
+                if (result) {
+                    return result;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    getNestedHTMLElementsListOfColumnsORFieldsComponents(
+        columnsComponent: LayoutColumnComponent[] = this.rootLayoutComponent.columns,
+        elementsList: HTMLElement[] = []) {
+        for (const columnComponent of columnsComponent) {
+            elementsList.push(columnComponent.elementRef);
+            for (const childComponent of columnComponent.childrenComponents) {
+                if (childComponent instanceof LayoutComponent) {
+                    elementsList = this.getNestedHTMLElementsListOfColumnsORFieldsComponents(childComponent.columns, elementsList);
+                } else if (childComponent instanceof FieldComponent) {
+                    elementsList.push(childComponent.elementRef);
+                }
+            }
+        }
+        return elementsList;
     }
 
     //todo
     // InsertLayoutIntoLayoutColumn( targetElement: HTMLElement) {
-        
+
     //     const parentColumnElement = targetElement.closest('.layout-column-component') as HTMLElement;
     //     const dataLayoutColumn = parentColumnElement.getAttribute('data-col');
     //     const layoutColumn = JSON.parse(dataLayoutColumn);
@@ -269,7 +290,7 @@ class Form {
     //     //insert field visually
     //     const listItemElement = document.createElement("div");
     //     listItemElement.draggable = true;
-        
+
     //     // TODO : li event listner on drag
 
     //     const label = document.createElement("label");
@@ -295,59 +316,6 @@ class Form {
     //     nestedLayoutCompnent.childrenComponents.push(fieldComponenet);
     // }
 
-
-    getClosestColumn(eventTarget: HTMLElement): LayoutComponent | undefined {
-        let layoutElement = eventTarget.closest('.layout') as HTMLElement;
-        if (layoutElement) {
-            const layoutId = layoutElement.dataset.componentId;
-            const layoutComponent = this.form.getComponentById(layoutId) as LayoutComponent;
-            return layoutComponent;
-        }
-        return undefined;
-    }
-
-    getComponentById(id: string): Component | undefined {
-        // Check if the id of the root layout component matches the given id
-        if (this.rootLayoutComponent.id === id) {
-            return this.rootLayoutComponent;
-        }
-
-        // Recursive search for the component with the given id
-        function searchComponent(component: Component): Component | undefined {
-            // If the component id matches the given id, return the component
-            if (component.id === id) {
-                return component;
-            }
-
-            // If the component is a layout component, search in all its nested components
-            if (component instanceof LayoutComponent) {
-                for (const column of component.columns) {
-                    for (const nestedComponent of column) {
-                        const result = searchComponent(nestedComponent);
-                        if (result) {
-                            return result;
-                        }
-                    }
-                }
-            }
-
-            // If the component is a field component, search in its parent layout component
-            if (component instanceof FieldComponent && component.field) {
-                const parentComponent = searchComponent(component.field);
-                if (parentComponent instanceof LayoutComponent) {
-                    return parentComponent;
-                }
-            }
-
-            // If the component is not found, return undefined
-            console.error(`Component with id ${componentId} not found`);
-            return;
-
-        }
-
-        // Start the recursive search from the root layout component
-        return searchComponent(this.rootLayoutComponent);
-    }
 }
 
 
@@ -368,9 +336,36 @@ class FormBuilder {
         this.formBuilderContainer = formBuilderContainer;
         this.fieldsHTMLElements = fieldsHTMLElements ?? [];
         this.sidebarContainer = sidebarElement;
-        this.form = form;
+        this.form = form ?? new Form();
         this.fieldsList = fieldsList ?? [];
+        this.initAndRenderRootLayoutComponent();
         this.LoadSidebarFields();
+    }
+
+    initAndRenderRootLayoutComponent() {
+        //create column component and html element -- with its data
+        const columnComponent = new LayoutColumnComponent();
+        const columnHtmlElement = document.createElement('div');
+        columnHtmlElement.classList.add('layout-column-component');
+        columnComponent.elementRef = columnHtmlElement;
+
+        //create root layout component and html elemnt -- with its data
+        const rootLayoutComponent = new LayoutComponent();
+        const rootLayoutHtmlElement = document.createElement('div');
+        rootLayoutHtmlElement.classList.add('layout-component');
+        rootLayoutComponent.elementRef = rootLayoutHtmlElement;
+
+        //bind column to layout comonent and html element
+        rootLayoutComponent.columns.push(columnComponent);
+        rootLayoutHtmlElement.appendChild(columnHtmlElement);
+        columnComponent.parentLayoutId = rootLayoutComponent.id;
+        this.form.rootLayoutComponent = rootLayoutComponent;
+
+        // bind dataset on html elements
+        columnHtmlElement.dataset.component = JSON.stringify(columnComponent);
+        rootLayoutHtmlElement.dataset.component = JSON.stringify(rootLayoutComponent);
+        //insert the layout component and html element into container and set html to rootlayout
+        this.formBuilderContainer.appendChild(rootLayoutHtmlElement);
     }
 
     LoadSidebarFields() {
@@ -461,44 +456,27 @@ class FormBuilder {
 
                 // get the event element 
                 const targetElement = event.target as HTMLElement;
-
                 //insert field into component layout column
-                this.form.insertFieldIntoLayoutColumn(fieldElement, targetElement);
+                const parentColumnElement = targetElement.closest('.layout-column-component') as HTMLElement;
+                targetElement.classList.remove('dragover');
+
+                this.form.insertFieldIntoLayoutColumn(fieldElement, parentColumnElement);
 
                 this.removeField(fieldElement);
-
-                // // check if layout insert to its column directly 
-                // if (targetElement.classList.contains('layout-column')) {
-                //     const columnIndex = Array.from(targetElement.parentElement.children).indexOf(targetElement);
-                //     this.form.insertFieldIntoLayoutColumn(component, columnIndex);
-                // }
-                // // else if field component then get its parent from form object then insert into the column array of the field
-                // else if (targetElement.classList.contains('field')) {
-                //     const fieldId = targetElement.dataset.fieldId;
-                //     const field = this.form.getFieldById(fieldId);
-                //     const columnIndex = field.columnIndex;
-
-                //     if (!field) {
-                //         console.error(`Field with id ${fieldId} not found`);
-                //         return;
-                //     }
-
-                //     this.form.insertComponentIntoLayout(component, field, columnIndex);
-                // }
-
-                // // add function called (on insert component to layout column array ) to insert it to the dom 
-                // this.insertComponentIntoDOM(component);
             });
         });
 
 
-        var allNestedElements = this.form.getFormAllNestedHtmlElementsAsList();
+        var allNestedElements = this.form.getNestedHTMLElementsListOfColumnsORFieldsComponents();
         allNestedElements.forEach(el => {
 
             // darg over highlight the form componenets
             el.addEventListener('dragover', (event) => {
                 event.preventDefault();
+                const targetElement = event.target as HTMLElement;
+                targetElement.classList.add('dragover');
             });
+
 
             //     // Event listener for adding layout
             //     this.addLayoutButton.addEventListener('click', () => {
@@ -580,13 +558,14 @@ class FormBuilder {
             //     }
             //     throw new Error(`Invalid component type: ${component.dataType}`);
             // }
-        }
+        });
+    }
 }
 
 
-    const formBuilderContainer = document.getElementById('mainContainer')!;
-    // const sidebarContainer = document.getElementById('sidebar-container')!;
-    // const addLayoutButton = document.getElementById('add-layout-button')!;
-    // const exportFormButton = document.getElementById('export-form-button')!;
-    // const viewFormButton = document.getElementById('view-form-button')!;
-    const formBuilder = new FormBuilder(formBuilderContainer, formBuilderContainer.querySelector('#sidebar'));
+const formBuilderContainer = document.getElementById('mainContainer')!;
+// const sidebarContainer = document.getElementById('sidebar-container')!;
+// const addLayoutButton = document.getElementById('add-layout-button')!;
+// const exportFormButton = document.getElementById('export-form-button')!;
+// const viewFormButton = document.getElementById('view-form-button')!;
+const formBuilder = new FormBuilder(formBuilderContainer, formBuilderContainer.querySelector('#sidebar'));
