@@ -1,38 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Form Builder and Renderer</title>
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <div class="container" id="mainContainer">
-      <div class="sidebar">
-        <h3>Fields</h3>
-        <ul id="sidebar"></ul>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>Form Builder and Renderer</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <div class="container" id="mainContainer">
+    <div class="sidebarWrapper">
+      <h3>Fields</h3>
+      <ul id="sidebarFieldsContainer"></ul>
+    </div>
+    <div class="main-form-container">
+      <div class="topbar">
+        <button id="removeComponentBtn">Remove Component</button>
+        <button id="addLayoutBtn">Add Layout</button>
+        <button id="exportFormBtn">Export Form</button>
+        <button id="viewFormBtn">View Form</button>
       </div>
-      <div class="form-container">
-        <div class="topbar">
-          <button id="add-layout">Add Layout</button>
-          <button id="export-form">Export Form</button>
-          <button id="view-form">View Form</button>
-        </div>
-        <div id="form" class="row">
-          <div class="col-4">
+      <div id="formBuilderWrapper" class="form-builder-wrapper">
 
-          </div>
-          <div class="col-4">
-
-          </div>
-          <div class="col-4">
-
-          </div>
-        </div>
       </div>
     </div>
-    <script crossorigin="anonymous" type="module" src="./main.js"></script>
+  </div>
+  <script type="module" src="./main.js"></script>
 
-  </body>
+</body>
+
 </html>
