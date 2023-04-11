@@ -51,6 +51,7 @@ class Field {
     id: string;
     name?: string;
     label?: string;
+    placeholder?: string;
     required?: boolean;
     type?: FieldType;
     elementRef: HTMLElement;
@@ -58,43 +59,47 @@ class Field {
     constructor(id?: string,
         name?: string,
         label?: string,
+        placeholder?: string,
         required?: boolean,
         type?: FieldType) {
 
-        this.id = id;
+        this.id = id ?? generate_uuidv4();
         this.name = name;
         this.label = label;
+        this.placeholder = placeholder;
         this.required = required;
         this.type = type;
     }
 }
 
 interface Component {
-    id: string;
-    label: string;
+    id?: string;
+    label?: string;
     visible?: boolean;
     styleClass?: string;
-    elementRef: HTMLElement;
+    elementRef?: HTMLElement;
     layoutColumnId?: string;
 }
 
 class FieldComponent implements Component {
-    id: string;
+    id?: string;
     dataType?: FieldType;
     field?: Field;
     layoutColumnId?: string;
-    label: string;
+    label?: string;
+    placeholder?: string;
     visible?: boolean;
     styleClass?: string;
-    elementRef: HTMLElement;
+    elementRef?: HTMLElement;
 
-    constructor(id?: string, field?: Field, label?: string, fieldType?: FieldType, layoutColumnId?: string, elementRef?: HTMLElement, styleClass?: string, visible?: boolean) {
-        this.id = id ?? generate_uuidv4();
+    constructor(field?: Field, layoutColumnId?: string, elementRef?: HTMLElement, styleClass?: string, visible?: boolean) {
         this.field = field;
-        this.label = label ?? field.label;
+        this.id = field.id ?? generate_uuidv4();
+        this.label = field.label;
+        this.placeholder = field.placeholder;
         this.visible = visible ?? true;
         this.styleClass = styleClass ?? "field-component";
-        this.dataType = fieldType ?? field.type;
+        this.dataType = field.type;
         this.layoutColumnId = layoutColumnId;
         this.elementRef = elementRef;
     }
@@ -148,6 +153,7 @@ class LayoutColumnComponent implements Component {
 // Initialize form builder
 const fieldsDataSample: Field[] = [
     new Field(
+        null,
         "firstName",
         "First Name",
         "Enter your first name",
@@ -157,6 +163,7 @@ const fieldsDataSample: Field[] = [
         })
     ),
     new Field(
+        null,
         "lastName",
         "Last Name",
         "Enter your last name",
@@ -166,6 +173,7 @@ const fieldsDataSample: Field[] = [
         })
     ),
     new Field(
+        null,
         "age",
         "Age",
         "Enter your age",
@@ -173,6 +181,7 @@ const fieldsDataSample: Field[] = [
         new FieldType(DataTypes.WholeNumber)
     ),
     new Field(
+        null,
         "gender",
         "Gender",
         "Select your gender",
@@ -185,6 +194,7 @@ const fieldsDataSample: Field[] = [
         })
     ),
     new Field(
+        null,
         "birthDate",
         "Birth Date",
         "Enter your birth date",
@@ -192,6 +202,7 @@ const fieldsDataSample: Field[] = [
         new FieldType(DataTypes.DateTime)
     ),
     new Field(
+        null,
         "bio",
         "Bio",
         "Enter your bio",
@@ -310,7 +321,6 @@ class Form {
         //insert field visually
         const listItemElement = document.createElement("li");
         listItemElement.classList.add("field-component");
-        listItemElement.setAttribute("tabIndex", '1');//for enabling focus and blur events
         listItemElement.dataset.field = fieldElement.getAttribute('data-field');
         // TODO : li event listner on drag
 
@@ -321,7 +331,7 @@ class Form {
         const input = document.createElement("input");
         input.disabled = true;
         input.type = "text";
-        input.placeholder = field.name;
+        input.placeholder = field.placeholder;
         input.classList.add("field-input");
 
         listItemElement.appendChild(label);
@@ -333,29 +343,41 @@ class Form {
 
         //#insert into form tree
         // create the field componenet 
-        let fieldComponenet = new FieldComponent(field.id, field, field.name, field.type, layoutColumn.id, listItemElement);
+        let fieldComponenet = new FieldComponent(field, layoutColumn.id, listItemElement);
         //set fieldcomponenet as dataset json in li htmlelement
         listItemElement.dataset.component = JSON.stringify(fieldComponenet);
         let nestedLayoutCompnent = this.getComponentById(layoutColumn.id) as LayoutColumnComponent;
         nestedLayoutCompnent.childrenComponents.push(fieldComponenet);
 
         //select the field on click 
-        const focusBlurHandler = (event) => {
+        const selectComponentHandler = function () {
             debugger
-            if (event.type == 'focusin') {
-                if (!listItemElement.classList.contains('component-selected'))
-                    listItemElement.classList.add('component-selected');
-                this.selectedComponent = JSON.parse(listItemElement.getAttribute('data-component') ?? "");
+
+            const componentElement = listItemElement;
+            const component = JSON.parse(componentElement.dataset.component);
+
+            if (!this.selectedComponent ||
+                this.selectedComponent == null ||
+                component.id != this.selectedComponent.id) {
+
+                const resetSelectedClass = () => {
+                    const selectedElements = document.getElementsByClassName('component-selected');
+                    for (let i = 0; i < selectedElements.length; i++) {
+                        selectedElements[i].classList.remove('component-selected');
+                    };
+                }
+                resetSelectedClass();
+                componentElement.classList.add('component-selected');
+                this.selectedComponent = JSON.parse(componentElement.dataset.component ?? "");
                 this.selectedComponent = this.getComponentById(this.selectedComponent.id);
             }
-            else if (event.type == 'focusout' && event.target == this.selectedComponent.elementRef) {
+            else {//unselect
                 this.selectedComponent = null;
-                listItemElement.classList.remove('component-selected');
+                componentElement.classList.remove('component-selected');
             }
         }
 
-        listItemElement.addEventListener('focusin', focusBlurHandler);
-        listItemElement.addEventListener('focusout', focusBlurHandler);
+        listItemElement.addEventListener('click', selectComponentHandler.bind(this));
     }
 
     getComponentById(id: string, component: Component = this.rootLayoutComponent): Component | undefined {
@@ -412,6 +434,11 @@ class Form {
                 if (targetElement.classList.contains('layout-column-component') && !targetElement.classList.contains('dragover'))
                     targetElement.classList.add('dragover');
             });
+            el.addEventListener('dragleave', (event) => {
+                event.preventDefault();
+                const targetElement = event.target as HTMLElement;
+                targetElement.classList.remove('dragover');
+            });
 
             el.addEventListener('drop', (event: any) => {
                 debugger
@@ -451,8 +478,10 @@ class Form {
         });
     }
 
-    removeComponent(event) {
+    removeComponent() {
         debugger
+        if (!this.selectedComponent)
+            return;
         const parentColumnComponent = this.getComponentById(this.selectedComponent.layoutColumnId) as LayoutColumnComponent;
 
         //if fieldthen add back to fields list
@@ -466,7 +495,7 @@ class Form {
         parentColumnComponent.childrenComponents = parentColumnComponent.childrenComponents.filter(c => c.id != this.selectedComponent.id);
         //remove the component from column : dom
         parentColumnComponent.elementRef.removeChild(this.selectedComponent.elementRef);
-
+        this.selectedComponent = null;
     }
 
     //todo
@@ -509,7 +538,7 @@ class FormBuilder {
     }
 
     initTopBarEventListners() {
-        this.removeComponentBtn.addEventListener('click', this.form.removeComponent)
+        this.removeComponentBtn.addEventListener('click', this.form.removeComponent.bind(this.form))
 
         // Event listener for exporting form
         this.exportFormBtn.addEventListener('click', () => {

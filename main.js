@@ -40,23 +40,26 @@ var FieldType = /** @class */ (function () {
 }());
 var Field = /** @class */ (function () {
     // additional properties
-    function Field(id, name, label, required, type) {
-        this.id = id;
+    function Field(id, name, label, placeholder, required, type) {
+        this.id = id !== null && id !== void 0 ? id : generate_uuidv4();
         this.name = name;
         this.label = label;
+        this.placeholder = placeholder;
         this.required = required;
         this.type = type;
     }
     return Field;
 }());
 var FieldComponent = /** @class */ (function () {
-    function FieldComponent(id, field, label, fieldType, layoutColumnId, elementRef, styleClass, visible) {
-        this.id = id !== null && id !== void 0 ? id : generate_uuidv4();
+    function FieldComponent(field, layoutColumnId, elementRef, styleClass, visible) {
+        var _a;
         this.field = field;
-        this.label = label !== null && label !== void 0 ? label : field.label;
+        this.id = (_a = field.id) !== null && _a !== void 0 ? _a : generate_uuidv4();
+        this.label = field.label;
+        this.placeholder = field.placeholder;
         this.visible = visible !== null && visible !== void 0 ? visible : true;
         this.styleClass = styleClass !== null && styleClass !== void 0 ? styleClass : "field-component";
-        this.dataType = fieldType !== null && fieldType !== void 0 ? fieldType : field.type;
+        this.dataType = field.type;
         this.layoutColumnId = layoutColumnId;
         this.elementRef = elementRef;
     }
@@ -88,21 +91,21 @@ var LayoutColumnComponent = /** @class */ (function () {
 }());
 // Initialize form builder
 var fieldsDataSample = [
-    new Field("firstName", "First Name", "Enter your first name", true, new FieldType(DataTypes.SingleLineOfText, {
+    new Field(null, "firstName", "First Name", "Enter your first name", true, new FieldType(DataTypes.SingleLineOfText, {
         maxLength: 50
     })),
-    new Field("lastName", "Last Name", "Enter your last name", true, new FieldType(DataTypes.SingleLineOfText, {
+    new Field(null, "lastName", "Last Name", "Enter your last name", true, new FieldType(DataTypes.SingleLineOfText, {
         maxLength: 50
     })),
-    new Field("age", "Age", "Enter your age", true, new FieldType(DataTypes.WholeNumber)),
-    new Field("gender", "Gender", "Select your gender", true, new FieldType(DataTypes.OptionSet, {
+    new Field(null, "age", "Age", "Enter your age", true, new FieldType(DataTypes.WholeNumber)),
+    new Field(null, "gender", "Gender", "Select your gender", true, new FieldType(DataTypes.OptionSet, {
         options: [
             { label: "Male", value: "male" },
             { label: "Female", value: "female" }
         ]
     })),
-    new Field("birthDate", "Birth Date", "Enter your birth date", true, new FieldType(DataTypes.DateTime)),
-    new Field("bio", "Bio", "Enter your bio", true, new FieldType(DataTypes.MultipleLinesOfText, {
+    new Field(null, "birthDate", "Birth Date", "Enter your birth date", true, new FieldType(DataTypes.DateTime)),
+    new Field(null, "bio", "Bio", "Enter your bio", true, new FieldType(DataTypes.MultipleLinesOfText, {
         maxLength: 500
     })),
 ];
@@ -182,7 +185,6 @@ var Form = /** @class */ (function () {
         // this.initEventListeners();
     };
     Form.prototype.insertAndRenderFieldIntoLayoutColumn = function (fieldElement, parentColumnElement) {
-        var _this = this;
         debugger;
         var dataField = fieldElement.getAttribute('data-field');
         var field = JSON.parse(dataField);
@@ -191,7 +193,6 @@ var Form = /** @class */ (function () {
         //insert field visually
         var listItemElement = document.createElement("li");
         listItemElement.classList.add("field-component");
-        listItemElement.setAttribute("tabIndex", '1'); //for enabling focus and blur events
         listItemElement.dataset.field = fieldElement.getAttribute('data-field');
         // TODO : li event listner on drag
         var label = document.createElement("label");
@@ -200,7 +201,7 @@ var Form = /** @class */ (function () {
         var input = document.createElement("input");
         input.disabled = true;
         input.type = "text";
-        input.placeholder = field.name;
+        input.placeholder = field.placeholder;
         input.classList.add("field-input");
         listItemElement.appendChild(label);
         listItemElement.appendChild(input);
@@ -208,28 +209,38 @@ var Form = /** @class */ (function () {
         parentColumnElement.appendChild(listItemElement);
         //#insert into form tree
         // create the field componenet 
-        var fieldComponenet = new FieldComponent(field.id, field, field.name, field.type, layoutColumn.id, listItemElement);
+        var fieldComponenet = new FieldComponent(field, layoutColumn.id, listItemElement);
         //set fieldcomponenet as dataset json in li htmlelement
         listItemElement.dataset.component = JSON.stringify(fieldComponenet);
         var nestedLayoutCompnent = this.getComponentById(layoutColumn.id);
         nestedLayoutCompnent.childrenComponents.push(fieldComponenet);
         //select the field on click 
-        var focusBlurHandler = function (event) {
+        var selectComponentHandler = function () {
             var _a;
             debugger;
-            if (event.type == 'focusin') {
-                if (!listItemElement.classList.contains('component-selected'))
-                    listItemElement.classList.add('component-selected');
-                _this.selectedComponent = JSON.parse((_a = listItemElement.getAttribute('data-component')) !== null && _a !== void 0 ? _a : "");
-                _this.selectedComponent = _this.getComponentById(_this.selectedComponent.id);
+            var componentElement = listItemElement;
+            var component = JSON.parse(componentElement.dataset.component);
+            if (!this.selectedComponent ||
+                this.selectedComponent == null ||
+                component.id != this.selectedComponent.id) {
+                var resetSelectedClass = function () {
+                    var selectedElements = document.getElementsByClassName('component-selected');
+                    for (var i = 0; i < selectedElements.length; i++) {
+                        selectedElements[i].classList.remove('component-selected');
+                    }
+                    ;
+                };
+                resetSelectedClass();
+                componentElement.classList.add('component-selected');
+                this.selectedComponent = JSON.parse((_a = componentElement.dataset.component) !== null && _a !== void 0 ? _a : "");
+                this.selectedComponent = this.getComponentById(this.selectedComponent.id);
             }
-            else if (event.type == 'focusout' && event.target == _this.selectedComponent.elementRef) {
-                _this.selectedComponent = null;
-                listItemElement.classList.remove('component-selected');
+            else { //unselect
+                this.selectedComponent = null;
+                componentElement.classList.remove('component-selected');
             }
         };
-        listItemElement.addEventListener('focusin', focusBlurHandler);
-        listItemElement.addEventListener('focusout', focusBlurHandler);
+        listItemElement.addEventListener('click', selectComponentHandler.bind(this));
     };
     Form.prototype.getComponentById = function (id, component) {
         if (component === void 0) { component = this.rootLayoutComponent; }
@@ -285,6 +296,11 @@ var Form = /** @class */ (function () {
                 if (targetElement.classList.contains('layout-column-component') && !targetElement.classList.contains('dragover'))
                     targetElement.classList.add('dragover');
             });
+            el.addEventListener('dragleave', function (event) {
+                event.preventDefault();
+                var targetElement = event.target;
+                targetElement.classList.remove('dragover');
+            });
             el.addEventListener('drop', function (event) {
                 debugger;
                 event.preventDefault();
@@ -319,9 +335,11 @@ var Form = /** @class */ (function () {
             });
         });
     };
-    Form.prototype.removeComponent = function (event) {
+    Form.prototype.removeComponent = function () {
         var _this = this;
         debugger;
+        if (!this.selectedComponent)
+            return;
         var parentColumnComponent = this.getComponentById(this.selectedComponent.layoutColumnId);
         //if fieldthen add back to fields list
         if (this.selectedComponent instanceof FieldComponent) {
@@ -333,6 +351,7 @@ var Form = /** @class */ (function () {
         parentColumnComponent.childrenComponents = parentColumnComponent.childrenComponents.filter(function (c) { return c.id != _this.selectedComponent.id; });
         //remove the component from column : dom
         parentColumnComponent.elementRef.removeChild(this.selectedComponent.elementRef);
+        this.selectedComponent = null;
     };
     return Form;
 }());
@@ -349,7 +368,7 @@ var FormBuilder = /** @class */ (function () {
     }
     FormBuilder.prototype.initTopBarEventListners = function () {
         var _this = this;
-        this.removeComponentBtn.addEventListener('click', this.form.removeComponent);
+        this.removeComponentBtn.addEventListener('click', this.form.removeComponent.bind(this.form));
         // Event listener for exporting form
         this.exportFormBtn.addEventListener('click', function () {
             var form = _this.form;
