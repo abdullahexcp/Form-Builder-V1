@@ -46,6 +46,7 @@
   min-height: 10rem;
   background-color: white;
   padding: 1rem;
+  border: 1px solid #e2e2e2;
 }
 
 .field {

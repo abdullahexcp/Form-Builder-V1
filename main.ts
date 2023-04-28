@@ -229,10 +229,144 @@ class Form {
 
         this.loadSidebarFields();
         this.renderFieldsList();
-        this.initAndRenderRootLayoutComponent();
+        this.initRootLayoutComponent();
     }
     //todo : break down to more reusable and single responsibily
-    initAndRenderRootLayoutComponent() {
+    initRootLayoutComponent() {
+        this.rootLayoutComponent = this.createNewLayoutComponent(1);
+        this.rootLayoutComponent.columns[0].childrenComponents.push(this.createNewLayoutComponent(2));
+    }
+
+    renderRootLayoutComponent() {
+
+    }
+
+    renderFieldComponentToHTMLElement(fieldComponent: FieldComponent) {
+
+        const parentColumnElement = this.formBuilderContainer.querySelector('#' + fieldComponent.layoutColumnId);
+        //insert field visually
+        const listItemElement = document.createElement("li");
+        listItemElement.classList.add("field-component");
+        listItemElement.dataset.field = JSON.stringify(fieldComponent.field);
+
+        const label = document.createElement("label");
+        label.innerText = fieldComponent.field?.name;
+        label.classList.add('field-label');
+
+        const input = document.createElement("input");
+        input.disabled = true;
+        input.type = "text";
+        input.placeholder = fieldComponent.field.placeholder;
+        input.classList.add("field-input");
+
+        listItemElement.appendChild(label);
+        listItemElement.appendChild(input);
+
+        //#insert into form tree
+        // create the field componenet 
+        //set fieldcomponenet as dataset json in li htmlelement
+        listItemElement.dataset.component = JSON.stringify(fieldComponent);
+        listItemElement.id = fieldComponent.id;
+
+        // Append the list item to the unordered list
+        parentColumnElement.appendChild(listItemElement);
+
+        //select the field on click 
+        const selectComponentHandler = function () {
+            debugger
+
+            if (!this.selectedComponent ||
+                this.selectedComponent == null ||
+                fieldComponent.id != this.selectedComponent.id) {
+
+                const resetSelectedClass = () => {
+                    const selectedElements = document.getElementsByClassName('component-selected');
+                    for (let i = 0; i < selectedElements.length; i++) {
+                        selectedElements[i].classList.remove('component-selected');
+                    };
+                }
+                resetSelectedClass();
+                listItemElement.classList.add('component-selected');
+                this.selectedComponent = JSON.parse(listItemElement.dataset.component ?? "");
+                this.selectedComponent = this.getComponentById(this.selectedComponent.id);
+            }
+            else {//unselect
+                this.selectedComponent = null;
+                listItemElement.classList.remove('component-selected');
+            }
+        }
+
+        listItemElement.addEventListener('click', selectComponentHandler.bind(this));
+    }
+
+    createNewLayoutComponent(columnsCount: number) {
+        const columnsComponents = [];
+        while (columnsCount--) {
+            const columnComponent = new LayoutColumnComponent();
+            //columnComponent.elementRef = columnHtmlElement;
+            columnsComponents.push(columnComponent);
+        }
+
+        //create root layout component and html elemnt -- with its data
+        const layoutComponent = new LayoutComponent();
+        // rootLayoutComponent.elementRef = rootLayoutHtmlElement;
+
+        //bind column to layout comonent and html element
+        layoutComponent.columns = columnsComponents;
+        // columnComponent.parentLayoutId = rootLayoutComponent.id;
+
+        return layoutComponent;
+        // this.rootLayoutComponent = rootLayoutComponent;
+    }
+
+
+    createNewFieldComponentIntoLayoutComponent(field, parentLayoutId) {
+        // create the field componenet 
+        let fieldComponenet = new FieldComponent(field, parentLayoutId);
+
+        let parentLayoutComponent = this.getComponentById(parentLayoutId) as LayoutColumnComponent;
+        parentLayoutComponent.childrenComponents.push(fieldComponenet);
+        return fieldComponenet;
+    }
+
+    renderLayoutComponentToHTMLElements(layoutComponent: LayoutComponent) {
+        
+        const layoutHtmlElement = document.createElement('div');
+        layoutHtmlElement.classList.add('layout-component');
+        layoutHtmlElement.id = layoutComponent.id;
+        for (let columnComponent of layoutComponent.columns) {
+            const columnHtmlElement = document.createElement('div');
+            columnHtmlElement.classList.add('layout-column-component');
+            layoutHtmlElement.appendChild(columnHtmlElement);
+            columnHtmlElement.dataset.component = JSON.stringify(columnComponent);
+            columnHtmlElement.id = columnComponent.id;
+        }
+
+        layoutHtmlElement.dataset.component = JSON.stringify(layoutComponent);
+
+        return layoutHtmlElement;
+    }
+
+    renderFieldsList(fieldsList = this.fieldsList) {
+
+        if (fieldsList == this.fieldsList)// if render all fields
+            this.fieldsContainer.innerHTML = '';
+
+        for (let field of fieldsList) {
+            const fieldElement = document.createElement('li');
+            fieldElement.setAttribute('class', 'field');
+            fieldElement.setAttribute('draggable', 'true');
+            fieldElement.innerHTML = field.label;
+            field.elementRef = fieldElement;
+            fieldElement.dataset.field = JSON.stringify(field);
+            this.fieldsContainer.appendChild(fieldElement);
+        }
+
+        this.initFieldsEventListeners();
+
+    }
+
+    addNewLayoutComponent() {
         //create column component and html element -- with its data
         const columnComponent = new LayoutColumnComponent();
         const columnHtmlElement = document.createElement('div');
@@ -272,29 +406,8 @@ class Form {
         this.initFormComponentsEventListners();
     }
 
-    //todo
-    renderLayoutComponent(layoutComponenet: LayoutComponent) {
-        //todo implementation
-    }
 
-    renderFieldsList(fieldsList = this.fieldsList) {
 
-        if (fieldsList == this.fieldsList)// if render all fields
-            this.fieldsContainer.innerHTML = '';
-
-        for (let field of fieldsList) {
-            const fieldElement = document.createElement('li');
-            fieldElement.setAttribute('class', 'field');
-            fieldElement.setAttribute('draggable', 'true');
-            fieldElement.innerHTML = field.label;
-            field.elementRef = fieldElement;
-            fieldElement.dataset.field = JSON.stringify(field);
-            this.fieldsContainer.appendChild(fieldElement);
-        }
-
-        this.initFieldsEventListeners();
-
-    }
 
     loadSidebarFields() {
         // Load fields from API
@@ -498,6 +611,8 @@ class Form {
         this.selectedComponent = null;
     }
 
+
+
     //todo
     // InsertLayoutIntoLayoutColumn( targetElement: HTMLElement) {
     // }
@@ -540,6 +655,8 @@ class FormBuilder {
     initTopBarEventListners() {
         this.removeComponentBtn.addEventListener('click', this.form.removeComponent.bind(this.form))
 
+
+        this.addLayoutBtn.addEventListener('click', this.form.addNewLayoutComponent.bind(this.form));
         // Event listener for exporting form
         this.exportFormBtn.addEventListener('click', () => {
             const form = this.form;
