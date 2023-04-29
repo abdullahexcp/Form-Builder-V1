@@ -114,47 +114,132 @@ var Form = /** @class */ (function () {
         this.formBuilderContainer = formBuilderContainer;
         this.fieldsContainer = fieldsContainer;
         this.rootLayoutComponent = rootLayoutComponent;
-        this.loadSidebarFields();
+        this.loadFieldsList();
         this.renderFieldsList();
-        this.initAndRenderRootLayoutComponent();
+        this.renderRootLayoutComponent();
     }
-    //todo : break down to more reusable and single responsibily
-    Form.prototype.initAndRenderRootLayoutComponent = function () {
-        //create column component and html element -- with its data
-        var columnComponent = new LayoutColumnComponent();
-        var columnHtmlElement = document.createElement('div');
-        columnHtmlElement.classList.add('layout-column-component');
-        columnComponent.elementRef = columnHtmlElement;
-        //create column component and html element -- with its data
-        var columnComponent2 = new LayoutColumnComponent();
-        var columnHtmlElement2 = document.createElement('div');
-        columnHtmlElement2.classList.add('layout-column-component');
-        columnComponent2.elementRef = columnHtmlElement2;
-        //create root layout component and html elemnt -- with its data
-        var rootLayoutComponent = new LayoutComponent();
-        var rootLayoutHtmlElement = document.createElement('div');
-        rootLayoutHtmlElement.classList.add('layout-component');
-        rootLayoutComponent.elementRef = rootLayoutHtmlElement;
-        //bind column to layout comonent and html element
-        rootLayoutComponent.columns.push(columnComponent, columnComponent2);
-        rootLayoutHtmlElement.appendChild(columnHtmlElement);
-        rootLayoutHtmlElement.appendChild(columnHtmlElement2);
-        columnComponent.parentLayoutId = rootLayoutComponent.id;
-        columnComponent2.parentLayoutId = rootLayoutComponent.id;
-        this.rootLayoutComponent = rootLayoutComponent;
-        // bind dataset on html elements
-        columnHtmlElement.dataset.component = JSON.stringify(columnComponent);
-        columnHtmlElement2.dataset.component = JSON.stringify(columnComponent2);
-        rootLayoutHtmlElement.dataset.component = JSON.stringify(rootLayoutComponent);
-        //insert the layout component and html element into container and set html to rootlayout
-        this.formBuilderContainer.appendChild(rootLayoutHtmlElement);
-        //
-        //
-        this.initFormComponentsEventListners();
+    Form.prototype.initRootLayoutComponent = function () {
+        if (!this.rootLayoutComponent) {
+            this.rootLayoutComponent = this.createNewLayoutComponentIntoLayoutColumn(1, null);
+            this.createNewLayoutComponentIntoLayoutColumn(2, this.rootLayoutComponent.columns[0]);
+        }
+        return this.rootLayoutComponent;
     };
-    //todo
-    Form.prototype.renderLayoutComponent = function (layoutComponenet) {
-        //todo implementation
+    Form.prototype.renderRootLayoutComponent = function () {
+        var rootLayoutElement = this.renderLayoutComponentToHTMLElements(this.initRootLayoutComponent());
+        this.formBuilderContainer.appendChild(rootLayoutElement);
+    };
+    Form.prototype.createNewLayoutComponentIntoLayoutColumn = function (columnsCount, parentLayoutColumn) {
+        var columnsComponents = [];
+        while (columnsCount--) {
+            var columnComponent = new LayoutColumnComponent();
+            //columnComponent.elementRef = columnHtmlElement;
+            columnsComponents.push(columnComponent);
+        }
+        //create root layout component and html elemnt -- with its data
+        var layoutComponent = new LayoutComponent();
+        // rootLayoutComponent.elementRef = rootLayoutHtmlElement;
+        //bind column to layout comonent and html element
+        layoutComponent.columns = columnsComponents;
+        if (parentLayoutColumn) {
+            layoutComponent.layoutColumnId = parentLayoutColumn.id;
+            parentLayoutColumn.childrenComponents.push(layoutComponent);
+        }
+        return layoutComponent;
+    };
+    Form.prototype.createNewFieldComponentIntoLayoutComponent = function (field, parentLayoutColumn) {
+        // create the field componenet 
+        var fieldComponent = new FieldComponent(field, parentLayoutColumn.id);
+        if (parentLayoutColumn) {
+            fieldComponent.layoutColumnId = parentLayoutColumn.id;
+            parentLayoutColumn.childrenComponents.push(fieldComponent);
+        }
+        return fieldComponent;
+    };
+    Form.prototype.renderFieldComponentToHTMLElement = function (fieldComponent) {
+        var _a;
+        //insert field visually
+        var listItemElement = document.createElement("li");
+        listItemElement.classList.add("field-component");
+        listItemElement.dataset.field = JSON.stringify(fieldComponent.field);
+        var label = document.createElement("label");
+        label.innerText = (_a = fieldComponent.field) === null || _a === void 0 ? void 0 : _a.name;
+        label.classList.add('field-label');
+        var input = document.createElement("input");
+        input.disabled = true;
+        input.type = "text";
+        input.placeholder = fieldComponent.field.placeholder;
+        input.classList.add("field-input");
+        listItemElement.appendChild(label);
+        listItemElement.appendChild(input);
+        //two way binding
+        listItemElement.dataset.component = JSON.stringify(fieldComponent);
+        listItemElement.id = fieldComponent.id;
+        fieldComponent.elementRef = listItemElement;
+        //setup event listner
+        //select the field on click 
+        var selectComponentHandler = function () {
+            var _a;
+            debugger;
+            if (!this.selectedComponent ||
+                this.selectedComponent == null ||
+                fieldComponent.id != this.selectedComponent.id) {
+                var resetSelectedClass = function () {
+                    var selectedElements = document.getElementsByClassName('component-selected');
+                    for (var i = 0; i < selectedElements.length; i++) {
+                        selectedElements[i].classList.remove('component-selected');
+                    }
+                    ;
+                };
+                resetSelectedClass();
+                listItemElement.classList.add('component-selected');
+                this.selectedComponent = JSON.parse((_a = listItemElement.dataset.component) !== null && _a !== void 0 ? _a : "");
+                this.selectedComponent = this.getComponentById(this.selectedComponent.id);
+            }
+            else { //unselect
+                this.selectedComponent = null;
+                listItemElement.classList.remove('component-selected');
+            }
+        };
+        listItemElement.addEventListener('click', selectComponentHandler.bind(this));
+        return listItemElement;
+    };
+    Form.prototype.renderLayoutComponentToHTMLElements = function (layoutComponent) {
+        var _this = this;
+        var _a;
+        var layoutHtmlElement = document.createElement('div');
+        layoutHtmlElement.classList.add('layout-component');
+        layoutHtmlElement.id = layoutComponent.id;
+        var _loop_1 = function (columnComponent) {
+            var columnHtmlElement = document.createElement('div');
+            columnHtmlElement.classList.add('layout-column-component');
+            columnHtmlElement.dataset.component = JSON.stringify(columnComponent);
+            columnHtmlElement.id = columnComponent.id;
+            layoutHtmlElement.appendChild(columnHtmlElement);
+            //render column children
+            if (((_a = columnComponent.childrenComponents) === null || _a === void 0 ? void 0 : _a.length) > 0) {
+                columnComponent.childrenComponents.forEach(function (childComponent) {
+                    if (childComponent instanceof LayoutComponent) {
+                        var layoutElement = _this.renderLayoutComponentToHTMLElements(childComponent);
+                        columnHtmlElement.appendChild(layoutElement);
+                    }
+                    else if (childComponent instanceof FieldComponent) {
+                        var fieldElement = _this.renderFieldComponentToHTMLElement(childComponent);
+                        columnHtmlElement.appendChild(fieldElement);
+                    }
+                });
+            }
+        };
+        //render columns
+        for (var _i = 0, _b = layoutComponent.columns; _i < _b.length; _i++) {
+            var columnComponent = _b[_i];
+            _loop_1(columnComponent);
+        }
+        //two way binding
+        layoutHtmlElement.dataset.component = JSON.stringify(layoutComponent);
+        layoutHtmlElement.id = layoutComponent.id;
+        layoutComponent.elementRef = layoutHtmlElement;
+        return layoutHtmlElement;
     };
     Form.prototype.renderFieldsList = function (fieldsList) {
         if (fieldsList === void 0) { fieldsList = this.fieldsList; }
@@ -170,9 +255,18 @@ var Form = /** @class */ (function () {
             fieldElement.dataset.field = JSON.stringify(field);
             this.fieldsContainer.appendChild(fieldElement);
         }
-        this.initFieldsEventListeners();
+        this.setupFieldsEventListeners();
     };
-    Form.prototype.loadSidebarFields = function () {
+    Form.prototype.addNewLayoutComponent = function (event, colIndex) {
+        if (colIndex === void 0) { colIndex = 0; }
+        var parentColComponent = this.initRootLayoutComponent().columns[colIndex];
+        var newLayoutComponent = this.createNewLayoutComponentIntoLayoutColumn(1, parentColComponent);
+        var newLayoutElement = this.renderLayoutComponentToHTMLElements(newLayoutComponent);
+        var parentColElement = document.getElementById('#' + parentColComponent.id);
+        if (parentColElement)
+            parentColElement.appendChild(newLayoutElement);
+    };
+    Form.prototype.loadFieldsList = function () {
         // Load fields from API
         // this.LoadFieldsFromApi('https://example.com/api/fields')
         //     .then((data: Array<Field>) => {
@@ -244,6 +338,8 @@ var Form = /** @class */ (function () {
     };
     Form.prototype.getComponentById = function (id, component) {
         if (component === void 0) { component = this.rootLayoutComponent; }
+        if (!id)
+            return null;
         if (component.id === id) {
             return component;
         }
@@ -285,10 +381,16 @@ var Form = /** @class */ (function () {
         }
         return elementsList;
     };
-    Form.prototype.initFormComponentsEventListners = function () {
+    Form.prototype.setupFormComponentsEventListners = function () {
         var _this = this;
         var allNestedElements = this.getHTMLElementsListOfColumnsORFieldsComponentsOfRootLayoutComponent();
         allNestedElements.forEach(function (el) {
+            _this.setupComponentElementEventListner(el);
+        });
+    };
+    Form.prototype.setupComponentElementEventListner = function (el) {
+        var _this = this;
+        if (el.classList.contains('field-component')) {
             // darg over highlight the form componenets
             el.addEventListener('dragover', function (event) {
                 event.preventDefault();
@@ -316,7 +418,7 @@ var Form = /** @class */ (function () {
                 _this.insertAndRenderFieldIntoLayoutColumn(fieldElement, parentColumnElement);
                 _this.removeFieldFromFieldsListDom(fieldElement);
             });
-        });
+        }
     };
     Form.prototype.removeFieldFromFieldsListDom = function (fieldElement) {
         var dataField = fieldElement.getAttribute('data-field');
@@ -326,7 +428,7 @@ var Form = /** @class */ (function () {
         this.fieldsList = failed !== null && failed !== void 0 ? failed : this.fieldsList;
         this.fieldsContainer.removeChild(field.elementRef);
     };
-    Form.prototype.initFieldsEventListeners = function () {
+    Form.prototype.setupFieldsEventListeners = function () {
         var _this = this;
         // Event listeners for dragging and dropping fields
         this.fieldsList.forEach(function (field) {
@@ -369,6 +471,7 @@ var FormBuilder = /** @class */ (function () {
     FormBuilder.prototype.initTopBarEventListners = function () {
         var _this = this;
         this.removeComponentBtn.addEventListener('click', this.form.removeComponent.bind(this.form));
+        this.addLayoutBtn.addEventListener('click', this.form.addNewLayoutComponent.bind(this.form));
         // Event listener for exporting form
         this.exportFormBtn.addEventListener('click', function () {
             var form = _this.form;
